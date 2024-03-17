@@ -5,32 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import extractImgurId from "~/utils/link-cleaner";
-import { ReloadIcon } from "@radix-ui/react-icons"
-import { toast } from "~/components/ui/use-toast";
-
-export function ButtonLoading() {
-  return (
-    <Button className="w-full" disabled>
-      <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-      Please wait
-    </Button>
-  )
-}
-
-async function copyToClipboard(content: string) {
-  try {
-    await navigator.clipboard.writeText(content);
-    toast({
-      description: "URLs copied to clipboard 📋",
-      duration: 2000,
-      title: "Copied!",
-    })
-  } catch (err) {
-    console.error('Failed to copy:', err);
-  }
-
-}
-
+import { copyToClipboard, shuffleLinks, toggleImgTagsOnLinks } from "~/utils/formatter";
+import { ButtonLoading } from "~/components/button-loading";
 
 export default function Home() {
   const [inputValue, setInputValue] = useState("");
@@ -38,6 +14,18 @@ export default function Home() {
 
   // Setup the mutation with useMutation hook
   const { mutateAsync, isLoading, error } = api.imgur.getLinks.useMutation();
+
+  const handleWrapLinks = () => {
+    const result = toggleImgTagsOnLinks(textareaValue);
+    setTextareaValue(result);
+    // Or handle the result differently as per your needs
+  };
+
+  const handleShuffleLinks = () => {
+    const result = shuffleLinks(textareaValue);
+    setTextareaValue(result);
+    // Or handle the result differently as per your needs
+  };
 
   async function handleSubmit() {
 
@@ -84,12 +72,12 @@ export default function Home() {
         {error && <p>Error fetching images: {error.message}</p>}
         <div className="w-full max-w-md flex">
           <div className="w-2/3 pr-2 space-y-4">
-            <Textarea value={textareaValue} readOnly className="h-64 w-full" />
+            <Textarea value={textareaValue} readOnly className="h-64 w-full text-xs" />
           </div>
           <div className="w-1/3 flex flex-col space-y-4">
             <Button variant="secondary" onClick={() => copyToClipboard(textareaValue)} disabled={!textareaValue}>Copy to Clipboard</Button>
-            <Button disabled variant="secondary">Shuffle Links</Button>
-            <Button disabled variant="secondary">Add IMG Tags</Button>
+            <Button variant="secondary" onClick={() => handleShuffleLinks()} disabled={!textareaValue}>Shuffle Links</Button>
+            <Button variant="secondary" onClick={() => handleWrapLinks()} disabled={!textareaValue}>Toggle IMG Tags</Button>
           </div>
         </div>
       </div>
