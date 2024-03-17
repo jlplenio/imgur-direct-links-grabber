@@ -21,11 +21,11 @@ export const toggleImgTagsOnLinks = (text: string): string => {
 
 
 export const shuffleLinks = (text: string): string => {
-    let links = text.split('\n');
+    const links = text.split('\n');
 
     for (let i = links.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [links[i], links[j]] = [links[j] as string, links[i] as string]; // Swap elements
+        [links[i], links[j]] = [links[j]!, links[i]!];
     }
 
     return links.join('\n');
