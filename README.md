@@ -2,16 +2,15 @@
 
 Hosted here: https://imgur-direct-links.vercel.app/
 
-The Imgur Direct Link Grabber is a web application designed to extract direct image links from any given Imgur gallery URL. It's built using modern web technologies and provides a simple and intuitive user interface that ensures ease of use. It replaces the previous web application, because herko got too expensive: https://github.com/jlplenio/imgur-direct-links
+The Imgur Direct Link Grabber is a web application designed to extract direct image links from any given Imgur gallery URL. It's built using modern web technologies and provides a simple and intuitive user interface that ensures ease of use. It replaces the previous web application, because heroku got too expensive: https://github.com/jlplenio/imgur-direct-links
 
 ## Features
 
 - **Gallery URL Input**: Users can enter an Imgur gallery URL into the input field to retrieve direct links to images.
-- **Loading State**: Upon submitting the URL, the application indicates a loading state, providing feedback that it's processing the request.
 - **Image Links Display**: The direct links to the images are displayed in a read-only textarea, allowing for easy review.
-- **Copy to Clipboard**: With a single click, users can copy the displayed image links to their clipboard.
-- **Error Handling**: The application handles errors gracefully, displaying any issues encountered while fetching images.
-
+- **Copy to Clipboard**: Users can copy the displayed image links to their clipboard.
+- **Shuffle and Tag**: Users can shuffle image links and add tags. 
+ 
 ## Dependencies
 
 - React
