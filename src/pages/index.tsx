@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "~/utils/api";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,8 @@ import { ModeToggle } from "~/components/ThemeToggle";
 import KoFiButton from "~/components/KoFiButton";
 import ReactPlayer from "react-player";
 import { shouldShowFundingPrompt } from "~/utils/link-cleaner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
+import { TRPCClientError } from "@trpc/client";
 
 export default function Home() {
   const [inputValue, setInputValue] = useState("");
@@ -36,6 +31,21 @@ export default function Home() {
 
   // Setup the mutation with useMutation hook
   const { mutateAsync, isLoading, error } = api.imgur.getLinks.useMutation();
+
+  // Add an effect to handle persistent errors
+  useEffect(() => {
+    if (error) {
+      console.log("error", error);
+      if (error instanceof TRPCClientError) {
+        setTextareaValue(error.message);
+        console.error("TRPC Error:", error.message);
+      } else {
+        setTextareaValue("An unexpected error occurred");
+        console.error("Unknown Error:", error);
+      }
+      setPreviewUrl(null);
+    }
+  }, [error]);
 
   const handleWrapLinks = () => {
     const result = toggleImgTagsOnLinks(textareaValue);
@@ -56,28 +66,23 @@ export default function Home() {
       return;
     }
 
-    try {
-      setTextareaValue("loading...");
-      setPreviewUrl(null);
-      const data = await mutateAsync({ url: inputValue });
-      setTextareaValue(data);
-      // Set the first URL as preview and determine its type
-      const firstUrl = data.split("\n")[0];
-      if (firstUrl) {
-        const isVideo = firstUrl.endsWith(".mp4") || firstUrl.endsWith(".gifv");
-        setPreviewUrl({ url: firstUrl, type: isVideo ? "video" : "image" });
-      }
-      setProcessedCount((prev) => {
-        const newCount = prev + 1;
-        if (shouldShowFundingPrompt(newCount)) {
-          setShowFundingDialog(true);
-        }
-        return newCount;
-      });
-    } catch (err) {
-      console.error("Error fetching images:", err);
-      setPreviewUrl(null);
+    setTextareaValue("loading...");
+    setPreviewUrl(null);
+    const data = await mutateAsync({ url: inputValue });
+    setTextareaValue(data);
+    // Set the first URL as preview and determine its type
+    const firstUrl = data.split("\n")[0];
+    if (firstUrl) {
+      const isVideo = firstUrl.endsWith(".mp4") || firstUrl.endsWith(".gifv");
+      setPreviewUrl({ url: firstUrl, type: isVideo ? "video" : "image" });
     }
+    setProcessedCount((prev) => {
+      const newCount = prev + 1;
+      if (shouldShowFundingPrompt(newCount)) {
+        setShowFundingDialog(true);
+      }
+      return newCount;
+    });
   }
 
   return (
@@ -132,7 +137,6 @@ export default function Home() {
               )}
             </div>
           </div>
-          {error && <p>Error fetching images: {error.message}</p>}
           <div className="flex w-full max-w-md">
             <div className="w-3/4 space-y-4 pr-6">
               <Textarea
