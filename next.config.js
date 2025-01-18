@@ -9,7 +9,7 @@ const config = {
   reactStrictMode: true,
 
   images: {
-    domains: ["storage.ko-fi.com"],
+    domains: ["storage.ko-fi.com", "i.imgur.com"],
   },
 
   /**

@@ -20,7 +20,7 @@ const KoFiButton = () => {
           objectFit="contain"
         />
       </div>
-      <span className="pr-1">Fund Server Costs & Provide Feedback</span>
+      <span className="pr-1">Report Errors and Fund Server Costs</span>
     </Button>
   );
 };
