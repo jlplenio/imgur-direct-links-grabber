@@ -4,7 +4,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import Image from "next/image";
 import extractImgurId from "~/utils/link-cleaner";
 import {
   copyToClipboard,
@@ -179,11 +178,10 @@ export default function Home() {
               <Label className="text-l mb-2 block font-semibold">Preview</Label>
               <div className="relative h-48 w-full overflow-hidden rounded-lg">
                 {previewUrl.type === "image" ? (
-                  <Image
+                  <img
                     src={previewUrl.url}
                     alt="Preview"
-                    fill
-                    className="object-contain"
+                    className="object-contain w-full h-full"
                   />
                 ) : (
                   <ReactPlayer
@@ -218,12 +216,12 @@ export default function Home() {
           rel="noopener noreferrer"
           className="opacity-50 transition-opacity hover:opacity-100"
         >
-          <Image
+          <img
             className="dark:invert"
             src="/github_logo.svg"
             alt="GitHub Mark"
-            height={22}
             width={32}
+            height={22}
           />
         </a>
       </div>
