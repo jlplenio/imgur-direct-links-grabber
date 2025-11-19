@@ -174,7 +174,7 @@ export default function Home() {
                     d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                   />
                 </svg>
-                <span>Added support for all Imgur links and media types</span>
+                <span>Extended album ID support & preview gallery (Nov25)</span>
               </div>
             </div>
             <p className="text-l text-gray-500 dark:text-gray-400">
