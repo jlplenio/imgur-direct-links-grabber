@@ -42,3 +42,28 @@ export async function copyToClipboard(content: string) {
     console.error("Failed to copy:", err);
   }
 }
+
+export type MediaItem = {
+  url: string;
+  type: "image" | "video";
+};
+
+export function parseMediaUrls(text: string): MediaItem[] {
+  const urls: string[] = text
+    .split("\n")
+    .map((line: string) => line.trim())
+    .filter((line: string) => line.length > 0 && line.startsWith("http"));
+
+  return urls.map((url: string): MediaItem => {
+    const lowerUrl = url.toLowerCase();
+    const isVideo =
+      lowerUrl.endsWith(".mp4") ||
+      lowerUrl.endsWith(".gifv") ||
+      lowerUrl.endsWith(".webm") ||
+      lowerUrl.endsWith(".mov");
+    return {
+      url,
+      type: isVideo ? ("video" as const) : ("image" as const),
+    };
+  });
+}
