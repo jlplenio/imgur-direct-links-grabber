@@ -20,12 +20,23 @@ export default createNextApiHandler({
     return {};
   },
 
-  onError:
-    env.NODE_ENV === "development"
-      ? ({ path, error }) => {
-          console.error(
-            `❌ tRPC failed on ${path ?? "<no-path>"}: ${error.message}`,
-          );
-        }
-      : undefined,
+  onError: ({ path, error, input }) => {
+    // Extract URL from input for Vercel Messages column
+    const url = input && typeof input === "object" && "url" in input 
+      ? String(input.url) 
+      : input 
+        ? JSON.stringify(input) 
+        : "Unknown";
+    
+    // Log URL as primary message for Vercel Messages column
+    console.error(`URL: ${url}`);
+    
+    // Log full error details
+    console.error(`Error on ${path ?? "<no-path>"}: ${error.message}`);
+    
+    // Also log stack trace in development
+    if (env.NODE_ENV === "development" && error.stack) {
+      console.error("Stack trace:", error.stack);
+    }
+  },
 });
