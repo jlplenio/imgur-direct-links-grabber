@@ -10,6 +10,10 @@ import {
   shuffleLinks,
   toggleImgTagsOnLinks,
   parseMediaUrls,
+  formatAsBBCode,
+  formatAsHTML,
+  formatAsMarkdown,
+  formatAsPlainUrls,
   type MediaItem,
 } from "~/utils/formatter";
 import { ButtonLoading } from "~/components/button-loading";
@@ -19,7 +23,15 @@ import ReactPlayer from "react-player";
 import { shouldShowFundingPrompt } from "~/utils/link-cleaner";
 import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { TRPCClientError } from "@trpc/client";
-import { ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Download, Loader2, ChevronDown, Type } from "lucide-react";
+import JSZip from "jszip";
+import { toast } from "~/components/ui/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 
 export default function Home() {
   const [inputValue, setInputValue] = useState("");
@@ -30,6 +42,7 @@ export default function Home() {
   );
   const [processedCount, setProcessedCount] = useState(0);
   const [showFundingDialog, setShowFundingDialog] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
   // Setup the mutation with useMutation hook
   const { mutateAsync, isLoading, error } = api.imgur.getLinks.useMutation();
@@ -91,16 +104,122 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedImageIndex, previewUrls.length]);
 
-  const handleWrapLinks = () => {
-    const result = toggleImgTagsOnLinks(textareaValue);
+  const handleFormat = (formatType: string) => {
+    let result = "";
+    switch (formatType) {
+      case "bbcode":
+        result = formatAsBBCode(textareaValue);
+        break;
+      case "html":
+        result = formatAsHTML(textareaValue);
+        break;
+      case "markdown":
+        result = formatAsMarkdown(textareaValue);
+        break;
+      case "plain":
+        result = formatAsPlainUrls(textareaValue);
+        break;
+      default:
+        result = toggleImgTagsOnLinks(textareaValue);
+    }
     setTextareaValue(result);
-    // Or handle the result differently as per your needs
   };
 
   const handleShuffleLinks = () => {
     const result = shuffleLinks(textareaValue);
     setTextareaValue(result);
     // Or handle the result differently as per your needs
+  };
+
+  const handleDownloadZip = async () => {
+    if (previewUrls.length === 0) return;
+
+    setIsDownloadingZip(true);
+    const mediaItems = previewUrls; // Include both images and videos
+    
+    toast({
+      title: "Preparing download...",
+      description: `Fetching ${mediaItems.length} item${mediaItems.length === 1 ? "" : "s"}...`,
+      duration: 2000,
+    });
+
+    try {
+      const zip = new JSZip();
+      let successCount = 0;
+      let failCount = 0;
+
+      // Fetch all media items in parallel
+      const mediaPromises = mediaItems.map(async (item: MediaItem, index: number) => {
+        try {
+          const response = await fetch(item.url);
+          if (!response.ok) throw new Error(`Failed to fetch item ${index + 1}`);
+          const blob = await response.blob();
+          
+          // Extract filename from URL or use index with appropriate extension
+          const urlParts: string[] = item.url.split("/");
+          const lastPart: string | undefined = urlParts[urlParts.length - 1];
+          let filename: string = lastPart?.split("?")[0] ?? "";
+          
+          // If no extension found, add appropriate extension based on type
+          if (!filename || !filename.includes(".")) {
+            if (item.type === "video") {
+              filename = `video_${index + 1}.mp4`;
+            } else {
+              filename = `image_${index + 1}.jpg`;
+            }
+          }
+          
+          zip.file(filename, blob);
+          successCount++;
+        } catch (error) {
+          console.error(`Error fetching item ${index + 1}:`, error);
+          failCount++;
+        }
+      });
+
+      await Promise.all(mediaPromises);
+
+      if (successCount === 0) {
+        toast({
+          title: "Download failed",
+          description: "Failed to fetch any items. Please try again.",
+          variant: "destructive",
+          duration: 3000,
+        });
+        setIsDownloadingZip(false);
+        return;
+      }
+
+      // Generate zip file
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      
+      // Create download link
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `imgur_media_${Date.now()}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Success toast
+      toast({
+        title: "Download complete! 📦",
+        description: `Successfully downloaded ${successCount} item${successCount === 1 ? "" : "s"}${failCount > 0 ? ` (${failCount} failed)` : ""}`,
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error creating zip file:", error);
+      toast({
+        title: "Download failed",
+        description: "An error occurred while creating the zip file. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setIsDownloadingZip(false);
+    }
   };
 
   async function handleSubmit() {
@@ -174,7 +293,7 @@ export default function Home() {
                     d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                   />
                 </svg>
-                <span>Extended album ID support & preview gallery (Nov25)</span>
+                <span>More album ID support, download, formatting and preview gallery (Nov25)</span>
               </div>
             </div>
             <p className="text-l text-gray-500 dark:text-gray-400">
@@ -227,13 +346,50 @@ export default function Home() {
               >
                 Shuffle Links
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="mt-2"
+                    variant="secondary"
+                    disabled={!textareaValue}
+                  >
+                    <Type className="mr-2 h-4 w-4 shrink-0 stroke-[1.5]" />
+                    Format
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 stroke-[1.5]" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleFormat("plain")}>
+                    Plain URLs
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleFormat("bbcode")}>
+                    BBCode [IMG]
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleFormat("html")}>
+                    HTML &lt;img&gt;
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleFormat("markdown")}>
+                    Markdown ![image]
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 className="mt-2"
                 variant="secondary"
-                onClick={() => handleWrapLinks()}
-                disabled={!textareaValue}
+                onClick={handleDownloadZip}
+                disabled={previewUrls.length === 0 || isDownloadingZip}
               >
-                IMG Tags
+                {isDownloadingZip ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 shrink-0 stroke-[1.5] animate-spin" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4 shrink-0 stroke-[1.5]" />
+                    Download
+                  </>
+                )}
               </Button>
               <div className="ml-auto mt-auto">
                 <ModeToggle />

@@ -26,6 +26,7 @@
     "@vercel/analytics": "^1.2.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.352.0",
     "next": "^14.0.4",
     "next-themes": "^0.2.1",

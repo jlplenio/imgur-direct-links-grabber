@@ -19,6 +19,50 @@ export const toggleImgTagsOnLinks = (text: string): string => {
   return wrappedOrUnwrappedLinks.join("\n");
 };
 
+export const removeAllFormatting = (text: string): string => {
+  return text
+    .split("\n")
+    .map((line) => {
+      // Remove BBCode [IMG] tags
+      line = line.replace(/^\[IMG\](.*?)\[\/IMG\]$/g, "$1");
+      // Remove HTML img tags
+      line = line.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, "$1");
+      // Remove Markdown image syntax
+      line = line.replace(/!\[[^\]]*\]\(([^)]+)\)/g, "$1");
+      return line.trim();
+    })
+    .filter((line) => line.length > 0)
+    .join("\n");
+};
+
+export const formatAsBBCode = (text: string): string => {
+  // First extract URLs from any format
+  const cleaned = removeAllFormatting(text);
+  const links = cleaned.split("\n").filter((line) => line.trim().length > 0 && line.startsWith("http"));
+  return links.map((link) => `[IMG]${link.trim()}[/IMG]`).join("\n");
+};
+
+export const formatAsHTML = (text: string): string => {
+  // First extract URLs from any format
+  const cleaned = removeAllFormatting(text);
+  const links = cleaned.split("\n").filter((line) => line.trim().length > 0 && line.startsWith("http"));
+  return links.map((link) => `<img src="${link.trim()}" alt="" />`).join("\n");
+};
+
+export const formatAsMarkdown = (text: string): string => {
+  // First extract URLs from any format
+  const cleaned = removeAllFormatting(text);
+  const links = cleaned.split("\n").filter((line) => line.trim().length > 0 && line.startsWith("http"));
+  return links.map((link) => `![image](${link.trim()})`).join("\n");
+};
+
+export const formatAsPlainUrls = (text: string): string => {
+  // First extract URLs from any format
+  const cleaned = removeAllFormatting(text);
+  const links = cleaned.split("\n").filter((line) => line.trim().length > 0 && line.startsWith("http"));
+  return links.map((link) => link.trim()).join("\n");
+};
+
 export const shuffleLinks = (text: string): string => {
   const links = text.split("\n");
 
@@ -49,7 +93,9 @@ export type MediaItem = {
 };
 
 export function parseMediaUrls(text: string): MediaItem[] {
-  const urls: string[] = text
+  // First extract URLs from any format (BBCode, HTML, Markdown, or plain)
+  const cleaned = removeAllFormatting(text);
+  const urls: string[] = cleaned
     .split("\n")
     .map((line: string) => line.trim())
     .filter((line: string) => line.length > 0 && line.startsWith("http"));
