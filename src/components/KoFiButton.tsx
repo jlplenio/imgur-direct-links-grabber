@@ -2,25 +2,28 @@ import Image from "next/image";
 import { Button } from "./ui/button";
 
 const KoFiButton = () => {
-  const handleButtonClick = () => {
-    window.open("https://ko-fi.com/W7W512ZD8I", "_blank");
-  };
-
   return (
     <Button
-      onClick={handleButtonClick}
-      className="flex items-center justify-center space-x-1"
+      asChild
+      className="h-auto max-w-full whitespace-normal"
       variant="outline"
     >
-      <div className="mt-0.3 relative h-12 w-12">
-        <Image
-          src={"/kofi_logo.png"}
-          alt="KoFi Logo"
-          layout="fill"
-          objectFit="contain"
-        />
-      </div>
-      <span className="pr-1">Report Errors and Fund Server Costs</span>
+      <a
+        href="https://ko-fi.com/W7W512ZD8I"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span className="relative mr-2 h-8 w-8 shrink-0">
+          <Image
+            src={"/kofi_logo.png"}
+            alt=""
+            fill
+            sizes="32px"
+            className="object-contain"
+          />
+        </span>
+        <span>Report errors or support this tool</span>
+      </a>
     </Button>
   );
 };

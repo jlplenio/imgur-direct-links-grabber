@@ -1,30 +1,38 @@
-import { useState, useEffect } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { api } from "~/utils/api";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import extractImgurId from "~/utils/link-cleaner";
+import extractImgurId, { shouldShowFundingPrompt } from "~/utils/link-cleaner";
 import {
   copyToClipboard,
-  shuffleLinks,
-  toggleImgTagsOnLinks,
+  formatMediaItems,
   parseMediaUrls,
-  formatAsBBCode,
-  formatAsHTML,
-  formatAsMarkdown,
-  formatAsPlainUrls,
+  shuffleItems,
   type MediaItem,
+  type OutputFormat,
 } from "~/utils/formatter";
+import { createMediaZip } from "~/utils/download";
 import { ButtonLoading } from "~/components/button-loading";
 import { ModeToggle } from "~/components/ThemeToggle";
 import KoFiButton from "~/components/KoFiButton";
-import ReactPlayer from "react-player";
-import { shouldShowFundingPrompt } from "~/utils/link-cleaner";
 import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
-import { TRPCClientError } from "@trpc/client";
-import { ChevronLeft, ChevronRight, Play, Download, Loader2, ChevronDown, Type } from "lucide-react";
-import JSZip from "jszip";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Download,
+  Loader2,
+  ChevronDown,
+  Type,
+} from "lucide-react";
 import { toast } from "~/components/ui/use-toast";
 import {
   DropdownMenu,
@@ -35,223 +43,146 @@ import {
 
 export default function Home() {
   const [inputValue, setInputValue] = useState("");
-  const [textareaValue, setTextareaValue] = useState("");
-  const [previewUrls, setPreviewUrls] = useState<MediaItem[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>("plain");
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
     null,
   );
   const [processedCount, setProcessedCount] = useState(0);
   const [showFundingDialog, setShowFundingDialog] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const selectedThumbnailRef = useRef<HTMLButtonElement | null>(null);
+  const { mutateAsync, isLoading } = api.imgur.getLinks.useMutation();
 
-  // Setup the mutation with useMutation hook
-  const { mutateAsync, isLoading, error } = api.imgur.getLinks.useMutation();
+  const textareaValue = formatMediaItems(mediaItems, outputFormat);
+  const previewUrls = mediaItems;
 
-  // Add an effect to handle persistent errors
   useEffect(() => {
-    if (error) {
-      console.log("error", error);
-      if (error instanceof TRPCClientError) {
-        setTextareaValue(error.message);
-        console.error("TRPC Error:", error.message);
-      } else {
-        setTextareaValue("An unexpected error occurred");
-        console.error("Unknown Error:", error);
-      }
-      setPreviewUrls([]);
-      setSelectedImageIndex(null);
+    if (shouldShowFundingPrompt(processedCount)) {
+      setShowFundingDialog(true);
     }
-  }, [error]);
+  }, [processedCount]);
 
-  // Parse URLs when textarea value changes (for gallery)
-  useEffect(() => {
-    if (
-      textareaValue &&
-      !textareaValue.startsWith("loading") &&
-      !textareaValue.startsWith("Invalid") &&
-      !textareaValue.includes("error")
-    ) {
-      const mediaItems: MediaItem[] = parseMediaUrls(textareaValue);
-      setPreviewUrls(mediaItems);
-    } else if (
-      !textareaValue ||
-      textareaValue.startsWith("loading") ||
-      textareaValue.startsWith("Invalid")
-    ) {
-      setPreviewUrls([]);
-      setSelectedImageIndex(null);
-    }
-  }, [textareaValue]);
-
-  // Keyboard navigation for full-size view
-  useEffect(() => {
-    if (selectedImageIndex === null) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" && selectedImageIndex > 0) {
-        setSelectedImageIndex(selectedImageIndex - 1);
-      } else if (
-        e.key === "ArrowRight" &&
-        selectedImageIndex < previewUrls.length - 1
-      ) {
-        setSelectedImageIndex(selectedImageIndex + 1);
-      } else if (e.key === "Escape") {
-        setSelectedImageIndex(null);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedImageIndex, previewUrls.length]);
-
-  const handleFormat = (formatType: string) => {
-    let result = "";
-    switch (formatType) {
-      case "bbcode":
-        result = formatAsBBCode(textareaValue);
-        break;
-      case "html":
-        result = formatAsHTML(textareaValue);
-        break;
-      case "markdown":
-        result = formatAsMarkdown(textareaValue);
-        break;
-      case "plain":
-        result = formatAsPlainUrls(textareaValue);
-        break;
-      default:
-        result = toggleImgTagsOnLinks(textareaValue);
-    }
-    setTextareaValue(result);
+  const handleFormat = (format: OutputFormat) => {
+    setOutputFormat(format);
   };
 
   const handleShuffleLinks = () => {
-    const result = shuffleLinks(textareaValue);
-    setTextareaValue(result);
-    // Or handle the result differently as per your needs
+    setMediaItems((items) => shuffleItems(items));
+    setSelectedImageIndex(null);
   };
 
   const handleDownloadZip = async () => {
-    if (previewUrls.length === 0) return;
-
+    if (mediaItems.length === 0 || isDownloadingZip) return;
     setIsDownloadingZip(true);
-    const mediaItems = previewUrls; // Include both images and videos
-    
-    toast({
-      title: "Preparing download...",
-      description: `Fetching ${mediaItems.length} item${mediaItems.length === 1 ? "" : "s"}...`,
-      duration: 2000,
-    });
 
     try {
-      const zip = new JSZip();
-      let successCount = 0;
-      let failCount = 0;
-
-      // Fetch all media items in parallel
-      const mediaPromises = mediaItems.map(async (item: MediaItem, index: number) => {
-        try {
-          const response = await fetch(item.url);
-          if (!response.ok) throw new Error(`Failed to fetch item ${index + 1}`);
-          const blob = await response.blob();
-          
-          // Extract filename from URL or use index with appropriate extension
-          const urlParts: string[] = item.url.split("/");
-          const lastPart: string | undefined = urlParts[urlParts.length - 1];
-          let filename: string = lastPart?.split("?")[0] ?? "";
-          
-          // If no extension found, add appropriate extension based on type
-          if (!filename || !filename.includes(".")) {
-            if (item.type === "video") {
-              filename = `video_${index + 1}.mp4`;
-            } else {
-              filename = `image_${index + 1}.jpg`;
-            }
-          }
-          
-          zip.file(filename, blob);
-          successCount++;
-        } catch (error) {
-          console.error(`Error fetching item ${index + 1}:`, error);
-          failCount++;
-        }
-      });
-
-      await Promise.all(mediaPromises);
-
-      if (successCount === 0) {
-        toast({
-          title: "Download failed",
-          description: "Failed to fetch any items. Please try again.",
-          variant: "destructive",
-          duration: 3000,
-        });
-        setIsDownloadingZip(false);
-        return;
-      }
-
-      // Generate zip file
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      
-      // Create download link
-      const url = URL.createObjectURL(zipBlob);
+      const { blob, successCount, failedUrls } =
+        await createMediaZip(mediaItems);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `imgur_media_${Date.now()}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      link.download = "imgur_media_" + Date.now() + ".zip";
+      try {
+        document.body.appendChild(link);
+        link.click();
+      } finally {
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
 
-      // Success toast
       toast({
-        title: "Download complete! 📦",
-        description: `Successfully downloaded ${successCount} item${successCount === 1 ? "" : "s"}${failCount > 0 ? ` (${failCount} failed)` : ""}`,
-        duration: 3000,
+        title:
+          failedUrls.length > 0
+            ? "Download started with missing items"
+            : "Download started",
+        description:
+          successCount +
+          " item" +
+          (successCount === 1 ? "" : "s") +
+          " included." +
+          (failedUrls.length > 0
+            ? " " + failedUrls.length + " failed to download. Please try again."
+            : ""),
+        variant: failedUrls.length > 0 ? "destructive" : "default",
       });
     } catch (error) {
-      console.error("Error creating zip file:", error);
       toast({
         title: "Download failed",
-        description: "An error occurred while creating the zip file. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Could not create the ZIP file. Please try again.",
         variant: "destructive",
-        duration: 3000,
       });
     } finally {
       setIsDownloadingZip(false);
     }
   };
 
-  async function handleSubmit() {
-    if (extractImgurId(inputValue) == null) {
-      setTextareaValue("Invalid URL format");
-      setPreviewUrls([]);
-      setSelectedImageIndex(null);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isLoading) return;
+
+    if (extractImgurId(inputValue) === null) {
+      setRequestError("Enter a valid Imgur album, gallery, or image URL.");
       return;
     }
 
-    setTextareaValue("loading...");
-    setPreviewUrls([]);
+    setRequestError(null);
+    setHasLoaded(false);
+    setMediaItems([]);
     setSelectedImageIndex(null);
-    
+
     try {
       const data = await mutateAsync({ url: inputValue });
-      setTextareaValue(data);
-      setProcessedCount((prev) => {
-        const newCount = prev + 1;
-        if (shouldShowFundingPrompt(newCount)) {
-          setShowFundingDialog(true);
-        }
-        return newCount;
-      });
-    } catch (err) {
-      // Error handling is done in useEffect
-      setPreviewUrls([]);
-      setSelectedImageIndex(null);
+      const items = parseMediaUrls(data);
+      setMediaItems(items);
+      setHasLoaded(true);
+      if (items.length > 0) setProcessedCount((count) => count + 1);
+    } catch (error) {
+      setRequestError(
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred. Please try again.",
+      );
     }
   }
 
-  const handleThumbnailClick = (index: number) => {
+  const handleViewerKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      selectedImageIndex === null ||
+      mediaItems[selectedImageIndex]?.type === "video" ||
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      (event.target instanceof HTMLElement &&
+        event.target.closest(
+          "input, textarea, select, video, [role=slider], [contenteditable=true]",
+        ))
+    )
+      return;
+
+    if (event.key === "ArrowLeft" && selectedImageIndex > 0) {
+      event.preventDefault();
+      setSelectedImageIndex(selectedImageIndex - 1);
+    } else if (
+      event.key === "ArrowRight" &&
+      selectedImageIndex < mediaItems.length - 1
+    ) {
+      event.preventDefault();
+      setSelectedImageIndex(selectedImageIndex + 1);
+    }
+  };
+
+  const handleThumbnailClick = (
+    index: number,
+    thumbnail: HTMLButtonElement,
+  ) => {
+    selectedThumbnailRef.current = thumbnail;
     setSelectedImageIndex(index);
   };
 
@@ -293,14 +224,17 @@ export default function Home() {
                     d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                   />
                 </svg>
-                <span>More album ID support, download, formatting and preview gallery (Nov25)</span>
+                <span>
+                  More album ID support, download, formatting and preview
+                  gallery (Nov25)
+                </span>
               </div>
             </div>
             <p className="text-l text-gray-500 dark:text-gray-400">
               Enter an Imgur URL to get media direct links.
             </p>
           </div>
-          <div className="w-full max-w-md space-y-2">
+          <form className="w-full max-w-md space-y-2" onSubmit={handleSubmit}>
             <Label className="text-l font-semibold" htmlFor="url">
               Gallery URL
             </Label>
@@ -308,6 +242,16 @@ export default function Home() {
               <div className=" w-3/4 pr-6">
                 <Input
                   id="url"
+                  type="url"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  required
+                  aria-invalid={Boolean(
+                    requestError && extractImgurId(inputValue) === null,
+                  )}
+                  aria-describedby={requestError ? "url-error" : undefined}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder="https://imgur.com/..."
@@ -316,25 +260,45 @@ export default function Home() {
               {isLoading ? (
                 <ButtonLoading />
               ) : (
-                <Button className="w-1/4" onClick={handleSubmit}>
+                <Button className="w-1/4" type="submit">
                   Go
                 </Button>
               )}
             </div>
-          </div>
-          <div className="flex w-full max-w-md">
-            <div className="w-3/4 space-y-4 pr-6">
+            {requestError && (
+              <p
+                id="url-error"
+                role="alert"
+                className="text-sm text-destructive"
+              >
+                {requestError}
+              </p>
+            )}
+            <p role="status" className="text-sm text-muted-foreground">
+              {isLoading
+                ? "Fetching media links…"
+                : mediaItems.length > 0
+                  ? mediaItems.length + " media links ready."
+                  : hasLoaded
+                    ? "No supported media links were found in this album."
+                    : ""}
+            </p>
+          </form>
+          <div className="flex w-full max-w-md flex-col gap-4 sm:flex-row">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Label htmlFor="media-output">Direct links</Label>
               <Textarea
+                id="media-output"
                 value={textareaValue}
                 readOnly
                 className="h-64 w-full resize-none text-xs"
               />
             </div>
-            <div className="flex w-1/4 flex-1 flex-col">
+            <div className="flex flex-col sm:w-36 sm:pt-8">
               <Button
                 variant="secondary"
                 onClick={() => copyToClipboard(textareaValue)}
-                disabled={!textareaValue}
+                disabled={mediaItems.length === 0}
               >
                 To Clipboard
               </Button>
@@ -342,7 +306,7 @@ export default function Home() {
                 className="mt-2"
                 variant="secondary"
                 onClick={() => handleShuffleLinks()}
-                disabled={!textareaValue}
+                disabled={mediaItems.length === 0}
               >
                 Shuffle Links
               </Button>
@@ -351,7 +315,7 @@ export default function Home() {
                   <Button
                     className="mt-2"
                     variant="secondary"
-                    disabled={!textareaValue}
+                    disabled={mediaItems.length === 0}
                   >
                     <Type className="mr-2 h-4 w-4 shrink-0 stroke-[1.5]" />
                     Format
@@ -381,7 +345,7 @@ export default function Home() {
               >
                 {isDownloadingZip ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 shrink-0 stroke-[1.5] animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin stroke-[1.5]" />
                     Downloading...
                   </>
                 ) : (
@@ -396,77 +360,75 @@ export default function Home() {
               </div>
             </div>
           </div>
-          {previewUrls.length > 0 && (() => {
-            // Calculate grid layout based on image count
-            let cols: string;
-            let gap: string;
-            
-            if (previewUrls.length > 100) {
-              cols = "grid-cols-5 sm:grid-cols-8 md:grid-cols-10";
-              gap = "gap-0.5";
-            } else if (previewUrls.length > 50) {
-              cols = "grid-cols-4 sm:grid-cols-6 md:grid-cols-8";
-              gap = "gap-1";
-            } else if (previewUrls.length > 20) {
-              cols = "grid-cols-3 sm:grid-cols-4 md:grid-cols-6";
-              gap = "gap-1.5";
-            } else {
-              cols = "grid-cols-2 sm:grid-cols-3 md:grid-cols-4";
-              gap = "gap-2";
-            }
-            
-            return (
-              <div className="mt-4 w-full max-w-md">
-                <Label className="text-l mb-3 block font-semibold">
-                  Preview Gallery ({previewUrls.length}{" "}
-                  {previewUrls.length === 1 ? "item" : "items"})
-                </Label>
-                <div className="h-96 overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-sm">
-                  <div className={`grid ${cols} ${gap}`}>
-                    {previewUrls.map((item: MediaItem, index: number) => (
-                      <button
-                        key={index}
-                        onClick={() => handleThumbnailClick(index)}
-                        className="group relative aspect-square overflow-hidden rounded-md border border-border transition-all hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
-                      >
-                        {item.type === "image" ? (
-                          <img
-                            src={item.url}
-                            alt={`Preview ${index + 1}`}
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="relative h-full w-full bg-gray-100 dark:bg-gray-800">
-                            <ReactPlayer
-                              url={item.url}
-                              width="100%"
-                              height="100%"
-                              light
-                              playing={false}
-                              controls={false}
+          {previewUrls.length > 0 &&
+            (() => {
+              // Calculate grid layout based on image count
+              let cols: string;
+              let gap: string;
+
+              if (previewUrls.length > 100) {
+                cols = "grid-cols-5 sm:grid-cols-8 md:grid-cols-10";
+                gap = "gap-0.5";
+              } else if (previewUrls.length > 50) {
+                cols = "grid-cols-4 sm:grid-cols-6 md:grid-cols-8";
+                gap = "gap-1";
+              } else if (previewUrls.length > 20) {
+                cols = "grid-cols-3 sm:grid-cols-4 md:grid-cols-6";
+                gap = "gap-1.5";
+              } else {
+                cols = "grid-cols-2 sm:grid-cols-3 md:grid-cols-4";
+                gap = "gap-2";
+              }
+
+              return (
+                <div className="mt-4 w-full max-w-md">
+                  <Label className="text-l mb-3 block font-semibold">
+                    Preview Gallery ({previewUrls.length}{" "}
+                    {previewUrls.length === 1 ? "item" : "items"})
+                  </Label>
+                  <div className="h-96 overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-sm">
+                    <div className={`grid ${cols} ${gap}`}>
+                      {previewUrls.map((item: MediaItem, index: number) => (
+                        <button
+                          key={item.url + ":" + index}
+                          type="button"
+                          aria-label={`Open ${item.type} ${index + 1}`}
+                          onClick={(event) =>
+                            handleThumbnailClick(index, event.currentTarget)
+                          }
+                          className="group relative aspect-square overflow-hidden rounded-md border border-border transition-all hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
+                        >
+                          {item.type === "image" ? (
+                            <img
+                              src={item.url}
+                              alt=""
+                              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                              loading="lazy"
                             />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/30">
-                              <Play className="h-3 w-3 text-white drop-shadow-lg sm:h-4 sm:w-4" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-800">
+                              <Play aria-hidden="true" className="h-6 w-6" />
                             </div>
-                          </div>
-                        )}
-                      </button>
-                    ))}
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
         </div>
       </div>
 
-      <div className="mt-6 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2 text-card-foreground shadow-sm">
+      <div className="mt-6 flex w-full flex-col items-center gap-3 px-3">
+        <div className="flex max-w-full flex-col items-center gap-3 rounded-lg border bg-card px-4 py-2 text-card-foreground shadow-sm sm:flex-row">
           <div className="text-sm text-muted-foreground">
             Help keep this tool free
           </div>
-          <div className="h-4 w-px bg-border" aria-hidden="true" />
+          <div
+            className="hidden h-4 w-px bg-border sm:block"
+            aria-hidden="true"
+          />
           <KoFiButton />
         </div>
 
@@ -492,7 +454,7 @@ export default function Home() {
           selectedImageIndex !== null &&
           selectedImageIndex >= 0 &&
           selectedImageIndex < previewUrls.length
-            ? previewUrls[selectedImageIndex] ?? null
+            ? (previewUrls[selectedImageIndex] ?? null)
             : null;
 
         return (
@@ -502,7 +464,16 @@ export default function Home() {
               if (!open) setSelectedImageIndex(null);
             }}
           >
-            <DialogContent className="max-w-4xl p-0">
+            <DialogContent
+              className="max-w-4xl p-0"
+              aria-describedby={undefined}
+              onKeyDown={handleViewerKeyDown}
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                selectedThumbnailRef.current?.focus();
+              }}
+            >
+              <DialogTitle className="sr-only">Media viewer</DialogTitle>
               {selectedItem && (
                 <div className="relative">
                   <div className="relative flex aspect-video max-h-[80vh] items-center justify-center bg-black">
@@ -513,13 +484,15 @@ export default function Home() {
                         className="max-h-full max-w-full object-contain"
                       />
                     ) : (
-                      <ReactPlayer
-                        url={selectedItem.url}
-                        width="100%"
-                        height="100%"
+                      <video
+                        key={selectedItem.url}
+                        src={selectedItem.url}
+                        aria-label={`Video ${(selectedImageIndex ?? 0) + 1}`}
+                        className="max-h-[80vh] max-w-full"
                         controls
-                        playing
-                        style={{ maxHeight: "80vh" }}
+                        autoPlay
+                        playsInline
+                        preload="metadata"
                       />
                     )}
                   </div>
@@ -532,6 +505,7 @@ export default function Home() {
                         size="icon"
                         className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-50"
                         onClick={handlePrevious}
+                        aria-label="Previous media"
                         disabled={selectedImageIndex === 0}
                       >
                         <ChevronLeft className="h-6 w-6" />
@@ -541,6 +515,7 @@ export default function Home() {
                         size="icon"
                         className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-50"
                         onClick={handleNext}
+                        aria-label="Next media"
                         disabled={selectedImageIndex === previewUrls.length - 1}
                       >
                         <ChevronRight className="h-6 w-6" />
@@ -562,7 +537,10 @@ export default function Home() {
       })()}
 
       <Dialog open={showFundingDialog} onOpenChange={setShowFundingDialog}>
-        <DialogContent className="sm:max-w-[380px]">
+        <DialogContent
+          className="sm:max-w-[380px]"
+          aria-describedby={undefined}
+        >
           <div className="space-y-3">
             <DialogTitle className="text-center text-lg">
               Help Keep This Tool Free

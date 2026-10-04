@@ -8,10 +8,6 @@ await import("./src/env.js");
 const config = {
   reactStrictMode: true,
 
-  images: {
-    domains: ["storage.ko-fi.com", "i.imgur.com"],
-  },
-
   /**
    * If you are using `appDir` then you must comment the below `i18n` config out.
    *
