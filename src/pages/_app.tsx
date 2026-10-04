@@ -16,6 +16,9 @@ const MyApp: AppType = ({ Component, pageProps }) => {
     >
       <Head>
         <title>imgur.plen.io</title>
+        <link rel="icon" href="/favicon.ico?v=2" sizes="16x16 32x32 48x48" />
+        <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" sizes="180x180" />
         <meta
           name="description"
           content="Extract direct image, GIF, and video links from public Imgur posts in your browser."
