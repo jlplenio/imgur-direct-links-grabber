@@ -1,0 +1,68 @@
+[
+  {
+    "caption": "Forest light",
+    "path": "/design-preview/01-forest.jpg",
+    "provider": "Unsplash",
+    "source": "https://images.unsplash.com/photo-1448375240586-882707db888b?w=700\u0026h=480\u0026fit=crop\u0026q=80",
+    "purpose": "Sample media for design preview"
+  },
+  {
+    "caption": "Mountain lake",
+    "path": "/design-preview/02-lake.jpg",
+    "provider": "Unsplash",
+    "source": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=700\u0026h=480\u0026fit=crop\u0026q=80",
+    "purpose": "Sample media for design preview"
+  },
+  {
+    "caption": "Coastal blue",
+    "path": "/design-preview/03-coast.jpg",
+    "provider": "Unsplash",
+    "source": "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=700\u0026h=480\u0026fit=crop\u0026q=80",
+    "purpose": "Sample media for design preview"
+  },
+  {
+    "caption": "Alpine peaks",
+    "path": "/design-preview/04-mountains.jpg",
+    "provider": "Unsplash",
+    "source": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=700\u0026h=480\u0026fit=crop\u0026q=80",
+    "purpose": "Sample media for design preview"
+  },
+  {
+    "caption": "Morning meadow",
+    "path": "/design-preview/05-meadow.jpg",
+    "provider": "Unsplash",
+    "source": "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=700\u0026h=480\u0026fit=crop\u0026q=80",
+    "purpose": "Sample media for design preview"
+  },
+  {
+    "caption": "Desert contours",
+    "path": "/design-preview/06-canyon.jpg",
+    "provider": "Unsplash",
+    "source": "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=700\u0026h=480\u0026fit=crop\u0026q=80",
+    "purpose": "Sample media for design preview"
+  },
+  {
+    "caption": "Flower in the breeze (MP4)",
+    "path": "/design-preview/07-flower.mp4",
+    "provider": "MDN Web Docs",
+    "source": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+    "sourcePage": "https://github.com/mdn/interactive-examples/tree/main/live-examples/media/cc0-videos",
+    "license": "CC0-1.0",
+    "licenseSource": "https://github.com/mdn/interactive-examples/blob/main/LICENSE",
+    "mimeType": "video/mp4",
+    "sizeBytes": 1128375,
+    "purpose": "Real video playback and mixed-media album testing in the design preview"
+  },
+  {
+    "caption": "Flower in the breeze (WebM)",
+    "path": "/design-preview/08-flower.webm",
+    "provider": "MDN Web Docs",
+    "source": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm",
+    "sourcePage": "https://github.com/mdn/interactive-examples/tree/main/live-examples/media/cc0-videos",
+    "license": "CC0-1.0",
+    "licenseSource": "https://github.com/mdn/interactive-examples/blob/main/LICENSE",
+    "mimeType": "video/webm",
+    "sizeBytes": 554058,
+    "purpose": "Real video playback and mixed-media album testing in the design preview"
+  }
+]

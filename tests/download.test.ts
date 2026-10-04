@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { getEventListeners } from "node:events";
 import JSZip from "jszip";
 import { createMediaZip } from "../src/utils/download";
 
@@ -149,4 +150,111 @@ await test("ZIP byte budget applies across files and failed downloads release th
   );
   assert.equal(result.successCount, 1);
   assert.deepEqual(result.failedUrls, ["https://i.imgur.com/failed.jpg"]);
+});
+
+await test("ZIP rejects pre-cancelled work without making any requests", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let fetched = false;
+  await assert.rejects(
+    createMediaZip([image("https://i.imgur.com/first.jpg")], {
+      signal: controller.signal,
+      fetcher: async () => {
+        fetched = true;
+        return new Response(new Uint8Array([1]));
+      },
+    }),
+    /Download cancelled\./,
+  );
+  assert.equal(fetched, false);
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+});
+
+await test("ZIP cancellation aborts every active worker and never starts queued downloads", async () => {
+  const controller = new AbortController();
+  let fetched = 0;
+  let aborted = 0;
+  await assert.rejects(
+    createMediaZip(
+      Array.from({ length: 6 }, (_, index) =>
+        image(`https://i.imgur.com/${index}.jpg`),
+      ),
+      {
+        signal: controller.signal,
+        concurrency: 3,
+        fetcher: (_url, options) =>
+          new Promise<Response>((_resolve, reject) => {
+            fetched++;
+            options?.signal?.addEventListener(
+              "abort",
+              () => {
+                aborted++;
+                reject(new DOMException("Aborted", "AbortError"));
+              },
+              { once: true },
+            );
+            if (fetched === 3) controller.abort();
+          }),
+      },
+    ),
+    /Download cancelled\./,
+  );
+  assert.equal(fetched, 3);
+  assert.equal(aborted, 3);
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+});
+
+await test("ZIP cancellation rejects instead of delivering already completed files as a partial archive", async () => {
+  const controller = new AbortController();
+  let fetched = 0;
+  await assert.rejects(
+    createMediaZip(
+      [
+        image("https://i.imgur.com/completed.jpg"),
+        image("https://i.imgur.com/pending.jpg"),
+      ],
+      {
+        signal: controller.signal,
+        concurrency: 1,
+        fetcher: async () => {
+          if (++fetched === 1) return new Response(new Uint8Array([1, 2, 3]));
+          controller.abort();
+          throw new DOMException("Aborted", "AbortError");
+        },
+      },
+    ),
+    /Download cancelled\./,
+  );
+  assert.equal(fetched, 2);
+});
+
+await test("ZIP checks cancellation after archive generation", async (context) => {
+  const controller = new AbortController();
+  context.mock.method(JSZip.prototype, "generateAsync", async () => {
+    controller.abort();
+    return new Blob(["finished archive"]);
+  });
+  await assert.rejects(
+    createMediaZip([image("https://i.imgur.com/first.jpg")], {
+      signal: controller.signal,
+      fetcher: async () => new Response(new Uint8Array([1])),
+    }),
+    /Download cancelled\./,
+  );
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+});
+
+await test("ZIP removes its caller cancellation listener when archive generation throws", async (context) => {
+  const controller = new AbortController();
+  context.mock.method(JSZip.prototype, "generateAsync", async () => {
+    throw new Error("Archive generation failed");
+  });
+  await assert.rejects(
+    createMediaZip([image("https://i.imgur.com/first.jpg")], {
+      signal: controller.signal,
+      fetcher: async () => new Response(new Uint8Array([1])),
+    }),
+    /Archive generation failed/,
+  );
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
 });

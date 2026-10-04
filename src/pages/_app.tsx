@@ -2,8 +2,6 @@ import { type AppType } from "next/app";
 import { ThemeProvider } from "next-themes";
 import { Analytics } from "@vercel/analytics/react";
 
-import { api } from "~/utils/api";
-
 import "~/styles/globals.css";
 import Head from "next/head";
 import { Toaster } from "~/components/ui/toaster";
@@ -17,12 +15,12 @@ const MyApp: AppType = ({ Component, pageProps }) => {
       disableTransitionOnChange
     >
       <Head>
-        <title>Imgur Direct Link Grabber</title>
+        <title>imgur.plen.io</title>
         <meta
           name="description"
-          content="Extract direct image links from any given Imgur gallery URL."
+          content="Extract direct image, GIF, and video links from public Imgur posts in your browser."
         ></meta>
-        <meta property="og:title" content="Imgur Direct Link Grabber" />
+        <meta property="og:title" content="imgur.plen.io · Direct Imgur links" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://imgur.plen.io/" />
       </Head>
@@ -33,4 +31,4 @@ const MyApp: AppType = ({ Component, pageProps }) => {
   );
 };
 
-export default api.withTRPC(MyApp);
+export default MyApp;

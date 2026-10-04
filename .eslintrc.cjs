@@ -1,6 +1,6 @@
 /** @type {import("eslint").Linter.Config} */
 const config = {
-  ignorePatterns: [".next/", "next-env.d.ts"],
+  ignorePatterns: [".next/", "out/", "next-env.d.ts"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
     project: true,

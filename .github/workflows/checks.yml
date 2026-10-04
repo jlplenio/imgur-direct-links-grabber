@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      IMGURCLIENTID: ci-placeholder
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v7
@@ -27,3 +26,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Verify static output
+        run: |
+          test -f out/index.html
+          test -f out/404.html
+          test ! -d out/api

@@ -7,6 +7,8 @@
 
 # testing
 /coverage
+/design-drafts/
+/experiments/
 
 # database
 /prisma/db.sqlite
